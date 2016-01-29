@@ -1,0 +1,71 @@
+<html>
+<head>
+    <title>Lab 1: Fractal</title>
+
+</head>
+<body onload="webGLStart()">
+  <canvas id="glcanvas" style="border: none;" width="640" height="480">
+    Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
+  </canvas>
+	<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+    <script type="text/javascript" src="main.js"></script>
+	<script id="shader-vs" type="x-shader/x-vertex">
+		attribute vec3 aVertexPosition;
+		varying vec2 coord;
+		void main(void)
+		{
+			gl_Position = vec4 ( aVertexPosition, 1.0 );
+			coord = gl_Position.xy;
+		}
+	</script>
+	<script id="shader-fs" type="x-shader/x-fragment">
+		precision mediump float;
+	
+		varying vec2 coord;
+		uniform sampler2D tex;
+		uniform vec2 c;
+		uniform float iters;
+
+		void main() {
+			float x = coord.x;
+			float y = coord.y;
+			float w = 1.0;
+			float h = 1.0;
+			float init_re = c.x + (gl_FragCoord.x / 640.0) * 2.0;
+			float init_im = c.y + (1.0 - gl_FragCoord.y / 480.0) * 2.0;
+			float radius = 4.0;
+			float oldRe, oldIm, re, im;
+			re = init_re;
+			im = init_im;
+			const float max_iter = 301.0;
+			float r2 = 0.0;
+			float iter = 0.0;
+			for (float i = 0.0; i < max_iter; i += 1.0)
+			{
+				if (i >= iters) {
+					break;
+				}
+				if (r2 >= radius) {
+					break;
+				}
+				oldRe = re;
+				oldIm = im;
+				re = oldRe * oldRe - oldIm * oldIm - 0.8;
+				im = 2.0 * oldRe * oldIm + 0.156;
+				r2 = (re * re) + (im * im);
+				iter = i;
+			}
+			//float tex_coord = floor(r2 / radius * 5.0);
+			vec4 color;
+			if (iter >= iters - 0.1) {
+				gl_FragColor = texture2D(tex, vec2(r2 / radius, 0.5)).rgba;
+			}
+			else {
+				float idx = iter / iters;
+				color = texture2D(tex, vec2(idx, 0.5)).rgba;
+				gl_FragColor = color;
+			}
+		}
+	</script>
+</body>
+</html>
