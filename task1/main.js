@@ -1,4 +1,14 @@
 var gl;
+var center = {x: -1.5, y: -1.0};
+var zoom = 2.0;
+var param = { re: -0.8, im: 0.156};
+var iterationsNumber = 270;
+var isDragging = false;
+var offsetX;
+var offsetY;
+var prevDragX;
+var prevDragY;
+var dragVelocity = 0.1;
 function initGL(canvas) {
 	try {
 		gl = canvas.getContext("webgl");
@@ -63,7 +73,9 @@ function initShaders() {
 	gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 	shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "tex");
 	shaderProgram.iterUniform = gl.getUniformLocation(shaderProgram, "iters");
-	shaderProgram.cUniform = gl.getUniformLocation(shaderProgram, "c");
+	shaderProgram.cUniform = gl.getUniformLocation(shaderProgram, "center");
+	shaderProgram.paramUniform = gl.getUniformLocation(shaderProgram, "param");
+	shaderProgram.zoomUniform = gl.getUniformLocation(shaderProgram, "zoom");
 }
 function handleLoadedTexture(texture, image) {
 	gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -109,8 +121,10 @@ function drawScene() {
 	gl.bindTexture(gl.TEXTURE_2D, neheTexture);
 	gl.uniform1i(shaderProgram.samplerUniform, 0);
 	
-    gl.uniform1f(shaderProgram.iterUniform, 270.0);
-    gl.uniform2f(shaderProgram.cUniform, -1.50, -1.0);
+    gl.uniform1f(shaderProgram.iterUniform, iterationsNumber);
+    gl.uniform1f(shaderProgram.zoomUniform, zoom);
+    gl.uniform2f(shaderProgram.cUniform, center.x, center.y);
+    gl.uniform2f(shaderProgram.paramUniform, param.re, param.im);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, posBuffer.numItems);
     gl.flush();
 }
@@ -119,10 +133,75 @@ function tick() {
 	drawScene();
 }
 function webGLStart() {
-	var canvas = document.getElementById("glcanvas");
-	initGL(canvas);
+	var canvas = $("#glcanvas");
+	if ('onwheel' in document) {
+		// IE9+, FF17+, Ch31+
+		canvas.on("wheel", onWheel);
+	} else if ('onmousewheel' in document) {
+		canvas.on("mousewheel", onWheel);
+	}
+	
+	offsetX = canvas.offset().left;
+	offsetY = canvas.offset().top;
+	
+	canvas.mousedown(function(e){handleMouseDown(e);});
+	canvas.mousemove(function(e){handleMouseMove(e);});
+	canvas.mouseup(function(e){handleMouseUp(e);});
+	canvas.mouseout(function(e){handleMouseOut(e);});
+	
+	
+	
+	initGL(canvas[0]);
 	initShaders();
 	initBuffers();
 	initTexture();
     setInterval(drawScene, 15);
+}
+
+function onWheel(e) {
+    e = e || window.event;
+	var delta = e.originalEvent.deltaY || e.originalEvent.detail || e.originalEvent.wheelDelta;
+    var velocity = delta > 0 ? 1.1: 0.9;
+	var canvas = $("#glcanvas")
+	var x = e.clientX || e.originalEvent.clientX;
+	var y = e.clientY || e.originalEvent.clientY;
+	var mousex = x - canvas.offset().left;
+    var mousey = y - canvas.offset().top;
+    center.x += (mousex / 640) * zoom * (1 - velocity);
+    center.y += (mousey / 480) * zoom * (1 - velocity);
+    zoom *= velocity;
+}
+
+function handleMouseDown(e){
+	prevDragX=parseInt(e.originalEvent.clientX-offsetX);
+	prevDragY=parseInt(e.originalEvent.clientY-offsetY);
+	isDragging=true;
+}
+
+function handleMouseUp(e){
+	isDragging=false;
+}
+
+function handleMouseOut(e){
+	isDragging=false;
+}
+
+function handleMouseMove(e){
+	if(isDragging) {
+		var canMouseX=parseInt(e.originalEvent.clientX-offsetX);
+		var canMouseY=parseInt(e.originalEvent.clientY-offsetY);
+
+		center.x -= ((canMouseX - prevDragX) / 640) * zoom * dragVelocity;
+		center.y -= ((canMouseY - prevDragY) / 480) * zoom * dragVelocity;
+
+		prevDragX = canMouseX;
+		prevDragY = canMouseY;
+	}
+}
+
+
+function updateParameters() {
+	param.re = parseFloat($("#paramRe").val());
+	param.im = parseFloat($("#paramIm").val());
+	iterationsNumber = parseInt($("#iterationsNumber").val());
 }
