@@ -35,6 +35,7 @@
 <body>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r54/three.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
 
 <script src="CopyShader.js"></script>
 
@@ -57,7 +58,7 @@ var lightScene, lightNode, scene, sceneNode, quadScene, quadNode, emitterScene, 
 var rtColor, rtNormals, rtDepth, rtLightBuffer, rtFinal, rtEmitter, rtShadowMap;
 var compColor, compNormals, compDepth, compLightBuffer, compFinal, compositePass, compEmitter, compShadowMap;
 var matNormal, matClipDepth, matBasic, matUnlit, matDepth;
-var numLights = 1;
+var numLights = 3;
 var lights = new Array();
 var rad2deg = 180 / Math.PI;
 var params = {
@@ -79,6 +80,8 @@ var params = {
         return new THREE.Vector3(this.targetX, this.targetY, this.targetZ);
     }
 };
+var model;
+var maxLights = 26;
 // -----------------------
 // shader definitions
 // -----------------------
@@ -474,7 +477,7 @@ function bootstrap() {
 }
 
 function initLights(){
-    numLights = 10;
+    //numLights = 10;
 	var tmp = new THREE.SpotLight();
 	tmp.color = new THREE.Vector3( params.color[0], params.color[1], params.color[2]);
 	//tmp.color.divideScalar(255);
@@ -489,7 +492,7 @@ function initLights(){
 	tmp.movingParams[1] = Math.random();
 	tmp.movingParams[2] = Math.random();
 	lights.push(tmp);
-	for (i = 1; i < numLights; i++)
+	for (i = 1; i < maxLights; i++)
 	{
 	    var tmp = new THREE.PointLight();
 		tmp.color = new THREE.Vector3( Math.random(), Math.random(), Math.random());
@@ -561,7 +564,7 @@ function createRenderTargets() {
 
     var geomEmitter = new THREE.SphereGeometry( 0.5, 7, 7 );
 
-    for(var x = 0; x < numLights; x++){
+    for(var x = 0; x < maxLights; x++){
 		var curShader;
 		if (x == 0) {
 			curShader = lightShader;
@@ -745,7 +748,7 @@ function render() {
     } );
     compShadowMap.render();
 
-    for ( var i = 0, il = lightNode.children.length; i < il; i ++ ) {
+    for ( var i = 0, il = /*lightNode.children.length*/numLights; i < il; i ++ ) {
         var light = lightNode.children[ i ];
         var color = light.material.uniforms[ "lightColor" ].value;
 
@@ -765,14 +768,21 @@ function render() {
 
     for(var idx in lightNode.children)
     {
+		index = parseInt(idx);
+
         camera.projectionMatrixInverse.getInverse(camera.projectionMatrix);
         var light = lightNode.children[idx];
         var matLight = light.material;
         matLight.uniforms["matProjInverse"].value = camera.projectionMatrixInverse;
         matLight.uniforms["matView"].value = camera.matrixWorldInverse;
-		
-		if (idx != 0)
+		if (index != 0)
 		{
+			if (index >= numLights) {
+				lightNode.children[idx].emitter.visible = false;
+				continue;
+			} else {
+				lightNode.children[idx].emitter.visible = true;
+			}
 			lightPosition = lightNode.children[idx].material.uniforms["lightPos"].value;
 			var time = Date.now() * 0.0005;
 			lightPosition.x = Math.sin( time * lights[idx].movingParams[0] ) * 3;
@@ -825,6 +835,20 @@ bootstrap();
 initMaterials();
 initLights();
 createRenderTargets();
+
+var gui = new dat.GUI({
+	height : 5 * 32 - 1
+});
+
+var LightsNumberModel = function() {
+  this.lightsNumber = 2;
+};
+
+model = new LightsNumberModel();
+
+gui.add(model, 'lightsNumber', 1, maxLights - 1 ).step(1).onFinishChange(function(){
+	numLights = model.lightsNumber + 1;
+});
 
 var loader = new THREE.BinaryLoader();
 var binLoader = new THREE.BinaryLoader();
