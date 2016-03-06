@@ -38,9 +38,12 @@ function createScene() {
 		// mirrorMaterial.reflectionTexture.mirrorPlane = new BABYLON.Plane(0, -1.0, 0, -10.0);
 		// mirrorMaterial.reflectionTexture.renderList = [skybox];
 		mirrorMaterial.reflectionTexture = new BABYLON.CubeTexture("skybox/skybox", sceneB);
-		mirrorMaterial.alpha = 0.98;
+		mirrorMaterial.alpha = 1;
 		mirrorMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.1); 
 		mirrorMaterial.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1); 
+		
+		mirrorMaterial.reflectionTexture.level = 1;
+		mirrorMaterial.specularPower = 150;
 		
 		bunnymesh.material = mirrorMaterial;
 	}
