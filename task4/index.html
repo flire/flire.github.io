@@ -626,6 +626,7 @@ function createRenderTargets() {
 			emitterNode.add(emitterContainer);
 
 			meshLight.emitter = lightCone;
+			meshLight.emitter.visible = false;
 		}
 		else
 		{
@@ -831,10 +832,28 @@ function render() {
     compFinal.render();
 }
 
+function keyhandler(e) {
+   var key = e.keyCode ? e.keyCode : e.which;
+
+	var moveDistance = 5;
+	var rotateAngle = Math.PI / 360;
+	
+	if ( key == 37 )
+		camera.position.x += 1;
+	if ( key == 39 )
+		camera.position.x -= 1;	
+	if ( key == 38 )
+		camera.position.z += 1;
+	if ( key == 40 )
+		camera.position.z -= 1;
+}
+
 bootstrap();
 initMaterials();
 initLights();
 createRenderTargets();
+
+window.onkeydown = keyhandler;
 
 var gui = new dat.GUI({
 	height : 5 * 32 - 1
