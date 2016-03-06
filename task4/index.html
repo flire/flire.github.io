@@ -70,7 +70,7 @@ var params = {
     distance: 15.0001,
     angle : 0.7,
     intensity : 1.0,
-    color : [150, 150, 250],
+    color : [0.5, 0.5, 0.5],
     shadowBias : 0.0005,
     getPos:function(){
         return new THREE.Vector3(this.posX, this.posY, this.posZ);
@@ -230,6 +230,67 @@ var deferredlight_frag = "" +
         "}";
 
 // -----------------------
+var deferredpointlight_vert = "" +
+"varying vec3 lightView;" +
+"uniform vec3 lightPos;" +
+"uniform mat4 matView;" +
+"void main()" +
+"{" +
+"gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.),lightView=vec3(matView*vec4(lightPos,1.));" +
+"}"
+
+var deferredpointlight_frag = "" +
+"varying vec3 lightView;"+
+
+"uniform sampler2D samplerDepth;"+
+"uniform sampler2D samplerNormals;"+
+"uniform sampler2D samplerLightBuffer;"+
+
+"uniform float lightRadius;"+
+"uniform float lightIntensity;"+
+"uniform float viewHeight;"+
+"uniform float viewWidth;"+
+
+"uniform vec3 lightColor;"+
+
+"uniform mat4 matProjInverse;"+
+
+"void main()"+
+"{"+
+"vec2 texCoord = gl_FragCoord.xy / vec2(viewWidth, viewHeight);"+
+"float z = texture2D(samplerDepth, texCoord).x;"+
+"if(z == 0.0)"+
+"{"+
+"gl_FragColor = vec4(vec3(0.0), 1.0);"+
+"return;"+
+"}"+
+"float x = texCoord.x * 2.0 - 1.0;"+
+"float y = texCoord.y * 2.0 - 1.0;"+
+
+"vec4 projectedPos = vec4(x, y, z, 1.0);"+
+
+"vec4 viewPos = matProjInverse * projectedPos;"+
+"viewPos.xyz /= viewPos.w;"+
+"viewPos.w = 1.0;"+
+
+"vec3 lightDir = lightView - viewPos.xyz;"+
+"float dist = length(lightDir);"+
+
+"float cutoff = 0.3;"+
+"float denom = dist/lightRadius + 1.0;"+
+"float attenuation = 1.0 / (denom*denom);"+
+"attenuation = (attenuation - cutoff) / (1.0 - cutoff);"+
+"attenuation = max(attenuation, 0.0);"+
+
+"vec3 normal = texture2D( samplerNormals, texCoord).xyz * 2.0 - 1.0;" +
+"float diffuse = max(dot(normal, normalize(lightDir)), 0.0);" +
+
+"vec4 color = vec4(0.0);"+
+"color.xyz = lightColor * lightIntensity;"+
+"color.w = attenuation;"+
+"gl_FragColor = color * diffuse;"+
+"}";
+// -----------------------
 var composite_vert = "" +
         "void main()" +
         "{" +
@@ -335,6 +396,24 @@ var lightShader = {
     fragmentShader: deferredlight_frag
 };
 // -----------------------
+var pointlightShader = {
+    uniforms: {
+        samplerLightBuffer: { type: "t", value: 0, texture: null },
+        samplerNormals: { type: "t", value: 1, texture: null },
+        samplerDepth: { type: "t", value: 2, texture: null },
+        matView : { type: "m4", value: new THREE.Matrix4()},
+        matProjInverse : { type: "m4", value: new THREE.Matrix4()},
+        viewWidth: { type: "f", value: WIDTH},
+        viewHeight: { type: "f", value: HEIGHT},
+        lightPos: { type: "v3", value: new THREE.Vector3( 0, 0, 0 )},
+        lightColor: { type: "v3", value: new THREE.Vector3( 0, 0, 0 )},
+        lightIntensity: { type: "f", value: 1.0},
+        lightRadius: { type: "f", value: 1.0}
+    },
+    vertexShader: deferredpointlight_vert,
+    fragmentShader: deferredpointlight_frag
+};
+// -----------------------
 var compositeShader = {
     uniforms: {
         samplerLightBuffer: { type: "t", texture: null },
@@ -395,17 +474,34 @@ function bootstrap() {
 }
 
 function initLights(){
-    var tmp = new THREE.SpotLight();
-    tmp.color = new THREE.Vector3( params.color[0], params.color[1], params.color[2]);
-    tmp.color.divideScalar(255);
-    tmp.position = new THREE.Vector3(params.posX, params.posY, params.posZ);
-    tmp.target = new THREE.Vector3( params.targetX, params.targetY, params.targetZ);
-    tmp.intensity = params.intensity;
-    tmp.distance = params.distance;
-    tmp.angle = params.angle;
-    lights.push(tmp);
-
-    numLights = 1;
+    numLights = 10;
+	var tmp = new THREE.SpotLight();
+	tmp.color = new THREE.Vector3( params.color[0], params.color[1], params.color[2]);
+	//tmp.color.divideScalar(255);
+	tmp.position = new THREE.Vector3(params.posX, params.posY, params.posZ);
+	tmp.target = new THREE.Vector3( params.targetX, params.targetY, params.targetZ);
+	tmp.intensity = params.intensity;
+	tmp.distance = params.distance;
+	tmp.angle = params.angle;
+	
+	tmp.movingParams = [];
+	tmp.movingParams[0] = Math.random();
+	tmp.movingParams[1] = Math.random();
+	tmp.movingParams[2] = Math.random();
+	lights.push(tmp);
+	for (i = 1; i < numLights; i++)
+	{
+	    var tmp = new THREE.PointLight();
+		tmp.color = new THREE.Vector3( Math.random(), Math.random(), Math.random());
+		tmp.intensity = 1.0;
+		tmp.distance = 3;
+		
+		tmp.movingParams = [];
+		tmp.movingParams[0] = Math.random();
+		tmp.movingParams[1] = Math.random();
+		tmp.movingParams[2] = Math.random();
+		lights.push(tmp);
+	}
 }
 
 function createRenderTargets() {
@@ -459,13 +555,23 @@ function createRenderTargets() {
     lightShader.uniforms[ 'samplerDepth' ].value = compDepth.renderTarget2;
     lightShader.uniforms[ 'samplerLightBuffer' ].value = rtLightBuffer;
 
+    pointlightShader.uniforms[ 'samplerNormals' ].value = compNormals.renderTarget2;
+    pointlightShader.uniforms[ 'samplerDepth' ].value = compDepth.renderTarget2;
+    pointlightShader.uniforms[ 'samplerLightBuffer' ].value = rtLightBuffer;
+
     var geomEmitter = new THREE.SphereGeometry( 0.5, 7, 7 );
 
     for(var x = 0; x < numLights; x++){
+		var curShader;
+		if (x == 0) {
+			curShader = lightShader;
+		} else {
+			curShader = pointlightShader;
+		}
         var matLight = new THREE.ShaderMaterial({
-            uniforms:       THREE.UniformsUtils.clone( lightShader.uniforms ),
-            vertexShader:   lightShader.vertexShader,
-            fragmentShader: lightShader.fragmentShader
+            uniforms:       THREE.UniformsUtils.clone( curShader.uniforms ),
+            vertexShader:   curShader.vertexShader,
+            fragmentShader: curShader.fragmentShader
         });
 
         var light = lights[x];
@@ -473,46 +579,80 @@ function createRenderTargets() {
         matLight.blending = THREE.AdditiveBlending;
         matLight.transparent = true;
         matLight.depthWrite = false;
+		
 
-        matLight.uniforms["lightPosWS"].value = light.position;
-        matLight.uniforms["lightTargetWS"].value = light.target;
-        matLight.uniforms["lightAngle"].value = light.angle;
-        matLight.uniforms["lightIntensity"].value = light.intensity;
-        matLight.uniforms["lightColor"].value = light.color;
-        matLight.uniforms["lightDistance"].value = light.distance;
+		//lightNode.children[x].emitter.position = lightPosition;
+		
+		if (x == 0)
+		{
+			matLight.uniforms["lightPosWS"].value = light.position;
+			matLight.uniforms["lightTargetWS"].value = light.target;
+			matLight.uniforms["lightAngle"].value = light.angle;
+			matLight.uniforms["lightIntensity"].value = light.intensity;
+			matLight.uniforms["lightColor"].value = light.color;
+			matLight.uniforms["lightDistance"].value = light.distance;
 
-        var geomLight = new THREE.PlaneGeometry(1, 1);
-        var meshLight = new THREE.Mesh( geomLight, matLight );
-        lightNode.add( meshLight );
+			var geomLight = new THREE.PlaneGeometry(1, 1);
+			var meshLight = new THREE.Mesh( geomLight, matLight );
+			lightNode.add( meshLight );
 
-        var matEmitter = new THREE.ShaderMaterial({
+			var matEmitter = new THREE.ShaderMaterial({
 
-            uniforms:       THREE.UniformsUtils.clone( unlitShader.uniforms ),
-            vertexShader:   unlitShader.vertexShader,
-            fragmentShader: unlitShader.fragmentShader
+				uniforms:       THREE.UniformsUtils.clone( unlitShader.uniforms ),
+				vertexShader:   unlitShader.vertexShader,
+				fragmentShader: unlitShader.fragmentShader
 
-        });
+			});
 
-        var coneGeometry = new THREE.CylinderGeometry( 0.0001, 1, 1, 8, 1, false );
-        var coneMatrix = new THREE.Matrix4();
-        coneMatrix.rotateX( -Math.PI/2 );
-        coneMatrix.translate( new THREE.Vector3( 0, -0.5, 0 ) );
-        coneGeometry.applyMatrix( coneMatrix );
+			var coneGeometry = new THREE.CylinderGeometry( 0.0001, 1, 1, 8, 1, false );
+			var coneMatrix = new THREE.Matrix4();
+			coneMatrix.rotateX( -Math.PI/2 );
+			coneMatrix.translate( new THREE.Vector3( 0, -0.5, 0 ) );
+			coneGeometry.applyMatrix( coneMatrix );
 
-        var lightCone = new THREE.Mesh( coneGeometry, matEmitter );
-        var coneLength = light.distance ? light.distance : 10000;
-        var coneWidth = coneLength * Math.tan( light.angle * 0.5 ) * 2;
-        lightCone.scale.set( coneWidth, coneWidth, coneLength );
+			var lightCone = new THREE.Mesh( coneGeometry, matEmitter );
+			var coneLength = light.distance ? light.distance : 10000;
+			var coneWidth = coneLength * Math.tan( light.angle * 0.5 ) * 2;
+			lightCone.scale.set( coneWidth, coneWidth, coneLength );
 
-        var emitterContainer = new THREE.Object3D();
-        emitterContainer.position = light.position;
-        emitterContainer.add(lightCone);
-        emitterContainer.lookAt(light.target);
+			var emitterContainer = new THREE.Object3D();
+			emitterContainer.position = light.position;
+			emitterContainer.add(lightCone);
+			emitterContainer.lookAt(light.target);
 
-        emitterNode.add(emitterContainer);
+			emitterNode.add(emitterContainer);
 
-        meshLight.emitter = lightCone;
+			meshLight.emitter = lightCone;
+		}
+		else
+		{
+			matLight.uniforms["lightPos"].value = lights[x].position;
+			matLight.uniforms["lightRadius"].value = lights[x].distance;
+			matLight.uniforms["lightIntensity"].value = lights[x].intensity;
+			matLight.uniforms["lightColor"].value = lights[x].color;
+
+			// setup proxy geometry for this light
+			var geomLight = new THREE.SphereGeometry(lights[x].distance, 10, 10);
+			var meshLight = new THREE.Mesh(geomLight, matLight);
+			lightNode.add(meshLight);
+
+			// create emitter sphere
+			var geomEmitter = new THREE.SphereGeometry(0.1, 7, 7);
+			var matEmitter = new THREE.ShaderMaterial({
+				uniforms:       THREE.UniformsUtils.clone( unlitShader.uniforms ),
+				vertexShader:   unlitShader.vertexShader,
+				fragmentShader: unlitShader.fragmentShader
+			});
+			var meshEmitter = new THREE.Mesh(geomEmitter, matEmitter);
+			meshEmitter.position = lights[x].position;
+			emitterNode.add(meshEmitter);
+
+			// add emitter to light node
+			meshLight.emitter = meshEmitter;
+		}
     }
+	
+	
 
     compositeShader.uniforms[ 'samplerDepth' ].value = compDepth.renderTarget2;
     compositeShader.uniforms[ 'samplerNormals' ].value = compNormals.renderTarget2;
@@ -612,13 +752,14 @@ function render() {
         var emitter = light.emitter;
         emitter.material.uniforms[ "samplerDepth" ].value = compDepth.renderTarget2;
         emitter.material.uniforms[ "lightColor" ].value = color;
+		if (i == 0) {
+			var lightTarget = params.getTarget();
+			var coneLength = params.distance / 14;
+			var coneWidth = coneLength * Math.tan( params.angle * 0.5 );
 
-        var lightTarget = params.getTarget();
-        var coneLength = params.distance / 14;
-        var coneWidth = coneLength * Math.tan( params.angle * 0.5 );
-
-        emitterNode.children[i].children[0].scale.set(coneWidth, coneWidth, coneLength);
-        emitterNode.children[i].lookAt(lightTarget);
+			emitterNode.children[i].children[0].scale.set(coneWidth, coneWidth, coneLength);
+			emitterNode.children[i].lookAt(lightTarget);
+		}
     }
     compEmitter.render();
 
@@ -629,28 +770,45 @@ function render() {
         var matLight = light.material;
         matLight.uniforms["matProjInverse"].value = camera.projectionMatrixInverse;
         matLight.uniforms["matView"].value = camera.matrixWorldInverse;
+		
+		if (idx != 0)
+		{
+			lightPosition = lightNode.children[idx].material.uniforms["lightPos"].value;
+			var time = Date.now() * 0.0005;
+			lightPosition.x = Math.sin( time * lights[idx].movingParams[0] ) * 3;
+			lightPosition.y = Math.cos( time * lights[idx].movingParams[1] ) * 2 + 0.5;
+			lightPosition.z = Math.cos( time * lights[idx].movingParams[2] ) * 2 + 0.5;
+			lightNode.children[idx].emitter.position = lightPosition;
+		} else {
+			light.position.x = params.posX;
+			light.position.y = params.posY;
+			light.position.z = params.posZ;
+			var lightPos = matLight.uniforms["lightPosWS"].value;
+			//lightPos.x = params.posX;
+			//lightPos.y = params.posY;
+			//lightPos.z = params.posZ;
+			lightPos = light.position;
+			light.emitter.position = light.position;
+			emitterNode.children[idx].position = light.position;
+			//light.position = lightPos;
+			light.frustumCulled = false;
 
-        var lightPos = matLight.uniforms["lightPosWS"].value;
-        lightPos.x = params.posX;
-        lightPos.y = params.posY;
-        lightPos.z = params.posZ;
-        light.position = lightPos;
-        light.frustumCulled = false;
+			var lightTarget = matLight.uniforms["lightTargetWS"].value;
+			lightTarget.x = params.targetX;
+			lightTarget.y = params.targetY;
+			lightTarget.z = params.targetZ;
 
-        var lightTarget = matLight.uniforms["lightTargetWS"].value;
-        lightTarget.x = params.targetX;
-        lightTarget.y = params.targetY;
-        lightTarget.z = params.targetZ;
+			matLight.uniforms["lightColor"].value = lights[idx].color;//params.color[0] / 255;
+			//matLight.uniforms["lightColor"].value.y = params.color[1] / 255;
+			//matLight.uniforms["lightColor"].value.z = params.color[2] / 255;
 
-        matLight.uniforms["lightColor"].value.x = params.color[0] / 255;
-        matLight.uniforms["lightColor"].value.y = params.color[1] / 255;
-        matLight.uniforms["lightColor"].value.z = params.color[2] / 255;
+			light.material.uniforms["lightAngle"] .value = lights[idx].angle;
+			light.material.uniforms["lightIntensity"].value = lights[idx].intensity;
 
-        light.material.uniforms["lightAngle"] .value = params.angle;
-        light.material.uniforms["lightIntensity"].value = params.intensity;
+			var coneLength = params.distance;
+			var coneWidth = coneLength * Math.tan( params.angle * 0.5 ) * 2;
+		}
 
-        var coneLength = params.distance;
-        var coneWidth = coneLength * Math.tan( params.angle * 0.5 ) * 2;
     }
     compLightBuffer.render();
 
