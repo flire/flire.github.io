@@ -11,7 +11,7 @@ function createScene() {
 	var skybox = BABYLON.Mesh.CreateBox("skyBox", 1000.0, sceneB);
 	var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", sceneB);
 	skyboxMaterial.backFaceCulling = false;
-	skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("skybox/skybox", sceneB);
+	skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("skybox/skybox", sceneB, ["_px.jpg", "_py.jpg", "_pz.jpg", "_nx.jpg", "_ny.jpg", "_nz.jpg"], false);
 	skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
 	skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
 	skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
