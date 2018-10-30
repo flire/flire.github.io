@@ -9,6 +9,7 @@
    crossorigin=""></script>
    <style>
     #mapid { height: 100%; }
+	.popuptext { font-size: 16 }
    </style>
 </head>
 <body>
@@ -21,11 +22,30 @@
     });
     osmlayer.addTo(mymap);
     var markers = [
-        {name: "Академическая гимназия №56", coords: [59.9679856,30.303] }
+        {name: "Академическая гимназия №56", coords: [59.9679856,30.303] },
+		{name: "ГБДОУ №33", coords: [59.82911, 30.17011] },
+		{name: "ГБДОУ №23 общеразвивающего вида", coords: [59.84040, 30.26944] },
+		{name: "ГБДОУ №137", coords: [60.03214, 30.32681] },
+		{name: "ГБДОУ №96", coords: [59.85409, 30.33494] },
+		{name: "ГБДОУ №74", coords: [59.85781, 30.22053] },
+		{name: "ГБДОУ №72", coords: [59.86756, 30.26567] },
+		{name: "ГБДОУ №18", coords: [59.85489, 30.22892] },
+		{name: "ГБДОУ №62", coords: [59.84730, 30.24833] },
+		{name: "ГБДОУ №5", coords: [59.84149, 30.32817] },
+		{name: "ГБДОУ №93", coords: [60.04009, 30.33003] },
+		{name: "ГБДОУ №43", coords: [59.83697, 30.20343] },
+		{name: "ГБДОУ №202", coords: [59.98359, 30.35130] },
+		{name: "ГБДОУ №8", coords: [59.93171, 30.29987] },
+		{name: "ГБДОУ №14", coords: [59.82901, 30.22517] },
+		{name: "ГБДОУ №41 Центр интегрированного развития", coords: [59.94629, 30.35555] },
+		{name: "ГБДОУ №72", coords: [60.03735, 30.35369] },
+		{name: "ГБДОУ №35 комбинированного вида", coords: [lat=59.82593, 30.18233] },
+		{name: "ГБДОУ №120", coords: [60.05536, 30.31778] },
+		{name: "ГБДОУ детский сад Кудесница", coords: [59.97894, 30.29544] }
     ];
     for (let marker of markers)
     {
-        L.marker(marker.coords).addTo(mymap).bindPopup(marker.name);
+        L.marker(marker.coords).addTo(mymap).bindPopup("<span class=\"popuptext\">" + marker.name + "</span>");
     }
    </script>
 </body>
